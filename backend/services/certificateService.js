@@ -35,14 +35,28 @@ export const generateCertificate = async ({
     goodies,
 }) => {
     // 1. Determine verification URL
-    let baseUrl = process.env.VERIFICATION_BASE_URL || process.env.BACKEND_URL;
+    // Priority:
+    // a. Explicit VERIFICATION_BASE_URL
+    // b. Render auto-injected RENDER_EXTERNAL_URL (e.g. https://service.onrender.com)
+    // c. Railway auto-injected RAILWAY_PUBLIC_DOMAIN
+    // d. BACKEND_URL
+    // e. Local machine Wi-Fi IPv4 fallback for local development
+    let baseUrl =
+        process.env.VERIFICATION_BASE_URL ||
+        process.env.RENDER_EXTERNAL_URL ||
+        (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null) ||
+        process.env.BACKEND_URL;
+
     if (!baseUrl || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
         const localIp = getLocalNetworkIp();
         const port = process.env.PORT || 5000;
         baseUrl = `http://${localIp}:${port}`;
     }
 
+    // Clean trailing slashes
+    baseUrl = baseUrl.trim().replace(/\/+$/, "");
     const verificationUrl = `${baseUrl}/verify/${aceId}`;
+    console.log(`[Certificate] Encoded QR verification URL: ${verificationUrl}`);
 
     // 2. Read template background image
     const templatePath = path.join(process.cwd(), "templates", "acm_id_card_bg.png");
