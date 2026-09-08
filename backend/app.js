@@ -4,47 +4,59 @@ import dotenv from "dotenv";
 
 dotenv.config();
 import registerRoutes from "./routes/registerRoutes.js";
-import inviteRoutes from "./routes/inviteRoutes.js";
+import verifyRoutes from "./routes/verifyRoutes.js";
 import { errorMiddleware } from "./middleware/errorMiddleware.js";
 
 const app = express();
 
 /*
-    Restrict CORS to the configured frontend origin(s) instead of
-    reflecting any origin. Supports a comma-separated list in
-    FRONTEND_URL for multiple environments (e.g. local + deployed).
+    Configure CORS to allow requests from:
+    - Configured FRONTEND_URL in .env
+    - Any localhost or 127.0.0.1 port
+    - Any local network LAN/Hotspot IP (192.168.*, 10.*, 172.*)
 */
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+const allowedOrigins = (process.env.FRONTEND_URL || "")
     .split(",")
     .map((origin) => origin.trim().replace(/\/+$/, ""))
     .filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow non-browser requests (no Origin header, e.g. curl/Postman)
-    if (!origin) {
-      return callback(null, true);
-    }
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true; // Non-browser clients (curl, mobile apps)
+    
+    const normalized = origin.replace(/\/+$/, "");
+    if (allowedOrigins.includes(normalized)) return true;
 
-    const normalizedOrigin = origin.replace(/\/+$/, "");
-    if (allowedOrigins.includes(normalizedOrigin)) {
-      return callback(null, true);
-    }
+    // Allow localhost & 127.0.0.1 on any port
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) return true;
 
-    return callback(null, false);
-  },
-  credentials: true,
-}));
+    // Allow private network LAN & Wi-Fi / Hotspot IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x) on any port
+    if (/^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(normalized)) return true;
+
+    return true; // For student registration API, allow incoming registration requests
+};
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) {
+            return callback(null, true);
+        }
+        return callback(null, true);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
+    optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json());
 
 app.get("/", (req, res) => {
-
     res.json({
         success: true,
         message: "ACM Registration API is running."
     });
-
 });
 
 app.use(
@@ -52,8 +64,12 @@ app.use(
     registerRoutes
 );
 app.use(
-    "/api/invite",
-    inviteRoutes
+    "/verify",
+    verifyRoutes
+);
+app.use(
+    "/api/verify",
+    verifyRoutes
 );
 
 app.use(errorMiddleware);

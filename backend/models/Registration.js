@@ -46,7 +46,13 @@ const registrationSchema = new mongoose.Schema(
         year: {
             type: String,
             required: true,
-            enum: ["1st Year", "2nd Year L.E"],
+            enum: ["1st Year", "2nd Year", "3rd Year", "4th Year", "2nd Year L.E", "1st", "2nd", "3rd", "4th"],
+        },
+
+        mode: {
+            type: String,
+            enum: ["Normal", "Lateral", "normal", "lateral"],
+            default: "Normal",
         },
 
         registrationType: {

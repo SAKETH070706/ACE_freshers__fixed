@@ -179,6 +179,7 @@ function App() {
         branch: "",
         gender: "",
         year: "",
+        mode: "Normal",
         registrationType: "ACM India",
         payment: "",
         goodies: "",
@@ -558,6 +559,7 @@ function App() {
                 branch: "",
                 gender: "",
                 year: "",
+                mode: "Normal",
                 registrationType: "ACM India",
                 payment: "",
                 goodies: "",
@@ -1218,43 +1220,48 @@ function App() {
                         </label>
 
                         <div className="radio-group">
+                            {["1st Year", "2nd Year", "3rd Year", "4th Year"].map((yr) => (
+                                <label key={yr} className="radio-option">
+                                    <input
+                                        type="radio"
+                                        name="year"
+                                        value={yr}
+                                        checked={formData.year === yr}
+                                        onChange={handleChange}
+                                        required
+                                    />
+                                    {yr}
+                                </label>
+                            ))}
+                        </div>
 
-                            <label className="radio-option">
-
-                                <input
-                                    type="radio"
-                                    name="year"
-                                    value="1st Year"
-                                    checked={
-                                        formData.year ===
-                                        "1st Year"
-                                    }
-                                    onChange={handleChange}
-                                    required
-                                />
-
-                                1st Year
-
-                            </label>
+                    </div>
 
 
-                            <label className="radio-option">
 
-                                <input
-                                    type="radio"
-                                    name="year"
-                                    value="2nd Year L.E"
-                                    checked={
-                                        formData.year ===
-                                        "2nd Year L.E"
-                                    }
-                                    onChange={handleChange}
-                                />
+                    {/* ADMISSION MODE */}
 
-                                2nd Year L.E
+                    <div className="field">
 
-                            </label>
+                        <label>
+                            <svg className="field-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>
+                            Admission Mode <span className="req-star">*</span>
+                        </label>
 
+                        <div className="radio-group">
+                            {["Normal", "Lateral"].map((m) => (
+                                <label key={m} className="radio-option">
+                                    <input
+                                        type="radio"
+                                        name="mode"
+                                        value={m}
+                                        checked={formData.mode === m}
+                                        onChange={handleChange}
+                                        required
+                                    />
+                                    {m}
+                                </label>
+                            ))}
                         </div>
 
                     </div>

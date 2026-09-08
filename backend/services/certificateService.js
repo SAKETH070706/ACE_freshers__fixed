@@ -1,310 +1,25 @@
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
+import QRCode from "qrcode";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-import {
-    PDFDocument,
-    StandardFonts,
-    rgb,
-} from "pdf-lib";
-
-
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// ============================================================
-// Asset Path (resolved relative to backend directory)
-// ============================================================
-
-const getAssetPath = (...paths) => {
-    return path.resolve(
-        __dirname,
-        "..",
-        ...paths
-    );
-};
-
-
-// ============================================================
-// Color
-// ============================================================
-
-const textColor = rgb(
-    0.10,
-    0.10,
-    0.10
-);
-
-
-// ============================================================
-// Draw centered text
-// ============================================================
-
-const drawCenteredText = (
-    page,
-    text,
-    font,
-    size,
-    y,
-    color = textColor
-) => {
-
-    const pageWidth = page.getWidth();
-
-    const textWidth =
-        font.widthOfTextAtSize(
-            text,
-            size
-        );
-
-    const x =
-        (pageWidth - textWidth) / 2;
-
-    page.drawText(
-        text,
-        {
-            x,
-            y,
-            size,
-            font,
-            color,
+// Automatically detect local machine Wi-Fi IPv4 address for mobile QR scanning
+const getLocalNetworkIp = () => {
+    try {
+        const interfaces = os.networkInterfaces();
+        for (const name of Object.keys(interfaces)) {
+            for (const net of interfaces[name]) {
+                if (net.family === "IPv4" && !net.internal) {
+                    return net.address;
+                }
+            }
         }
-    );
-};
-
-
-// ============================================================
-// Draw label + value
-// ============================================================
-
-const drawLabelValue = (
-    page,
-    label,
-    value,
-    x,
-    y,
-    labelFont,
-    valueFont,
-    options = {}
-) => {
-
-    const labelSize =
-        options.labelSize || 15;
-
-    const valueSize =
-        options.valueSize || 15;
-
-    const color =
-        options.color || textColor;
-
-    const gap =
-        options.gap || 8;
-
-
-    const labelText =
-        `${label}:`;
-
-
-    page.drawText(
-        labelText,
-        {
-            x,
-            y,
-            size: labelSize,
-            font: labelFont,
-            color,
-        }
-    );
-
-
-    const labelWidth =
-        labelFont.widthOfTextAtSize(
-            labelText,
-            labelSize
-        );
-
-
-    let finalValueSize =
-        valueSize;
-
-
-    const maxWidth =
-        options.maxWidth || 900;
-
-
-    const availableWidth =
-        maxWidth -
-        labelWidth -
-        gap;
-
-
-    while (
-        finalValueSize > 10 &&
-        valueFont.widthOfTextAtSize(
-            String(value ?? ""),
-            finalValueSize
-        ) > availableWidth
-    ) {
-
-        finalValueSize--;
+    } catch {
+        // Fallback
     }
-
-
-    page.drawText(
-        String(value ?? ""),
-        {
-            x:
-                x +
-                labelWidth +
-                gap,
-
-            y,
-
-            size:
-                finalValueSize,
-
-            font:
-                valueFont,
-
-            color,
-        }
-    );
+    return "localhost";
 };
-
-
-// ============================================================
-// Draw signature + label
-// ============================================================
-
-const drawSignatureBlock = (
-    page,
-    signature,
-    centerX,
-    imageY,
-    signatureWidth,
-    label,
-    font
-) => {
-
-    const scale =
-        signatureWidth /
-        signature.width;
-
-
-    const signatureHeight =
-        signature.height *
-        scale;
-
-
-    const imageX =
-        centerX -
-        signatureWidth / 2;
-
-
-    // Signature
-    page.drawImage(
-        signature,
-        {
-            x: imageX,
-            y: imageY,
-            width: signatureWidth,
-            height: signatureHeight,
-        }
-    );
-
-
-    // Label below signature
-    const labelSize = 14;
-
-    const labelWidth =
-        font.widthOfTextAtSize(
-            label,
-            labelSize
-        );
-
-
-    page.drawText(
-        label,
-        {
-            x:
-                centerX -
-                labelWidth / 2,
-
-            y:
-                imageY -
-                35,
-
-            size:
-                labelSize,
-
-            font,
-            color: textColor,
-        }
-    );
-};
-
-
-// In-memory cache for static template and signature image assets
-let cachedAssets = null;
-
-const loadCertificateAssets = async () => {
-    if (cachedAssets) {
-        return cachedAssets;
-    }
-
-    const templatePath =
-        getAssetPath(
-            "templates",
-            "certificate-bg.jpg"
-        );
-
-    const hodSignaturePath =
-        getAssetPath(
-            "signatures",
-            "hod_sign.png"
-        );
-
-    const secretarySignaturePath =
-        getAssetPath(
-            "signatures",
-            "sec_sign.png"
-        );
-
-    const [
-        templateBytes,
-        hodSignatureBytes,
-        secretarySignatureBytes,
-    ] = await Promise.all([
-        fs.readFile(templatePath),
-        fs.readFile(hodSignaturePath),
-        fs.readFile(secretarySignaturePath),
-    ]);
-
-    cachedAssets = {
-        templateBytes,
-        hodSignatureBytes,
-        secretarySignatureBytes,
-    };
-
-    return cachedAssets;
-};
-
-// Sanitize string to WinAnsi supported characters so pdf-lib never throws
-const sanitizeWinAnsi = (str) => {
-    if (!str) return "";
-    return String(str)
-        .normalize("NFKD")
-        .replace(/[\u2018\u2019]/g, "'")
-        .replace(/[\u201C\u201D]/g, '"')
-        .replace(/[\u2013\u2014]/g, "-")
-        .replace(/[^\x20-\x7E\xA0-\xFF]/g, "")
-        .trim();
-};
-
-
-// ============================================================
-// Generate Certificate
-// ============================================================
 
 export const generateCertificate = async ({
     name,
@@ -314,503 +29,137 @@ export const generateCertificate = async ({
     branch,
     gender,
     year,
+    mode = "Normal",
     registrationType = "ACM India",
     payment,
     goodies,
 }) => {
-    // Sanitize user inputs for WinAnsi standard font
-    const cleanName = sanitizeWinAnsi(name);
-    const cleanEmail = sanitizeWinAnsi(email);
-    const cleanPhone = sanitizeWinAnsi(phone);
-    const cleanAceId = sanitizeWinAnsi(aceId);
-    const cleanBranch = sanitizeWinAnsi(branch);
-    const cleanGender = sanitizeWinAnsi(gender);
-    const cleanYear = sanitizeWinAnsi(year);
-    const cleanRegType = sanitizeWinAnsi(registrationType || "ACM India");
-    const cleanPayment = sanitizeWinAnsi(payment);
-    const cleanGoodies = sanitizeWinAnsi(goodies);
-
-    // ========================================================
-    // 1. Read cached assets
-    // ========================================================
-
-    const {
-        templateBytes,
-        hodSignatureBytes,
-        secretarySignatureBytes,
-    } = await loadCertificateAssets();
-
-
-    // ========================================================
-    // 3. Create PDF
-    // ========================================================
-
-    const pdfDoc =
-        await PDFDocument.create();
-
-
-    const background =
-        await pdfDoc.embedJpg(
-            templateBytes
-        );
-
-
-    const page =
-        pdfDoc.addPage([
-            background.width,
-            background.height,
-        ]);
-
-
-    // ========================================================
-    // 4. Draw official background
-    // ========================================================
-
-    page.drawImage(
-        background,
-        {
-            x: 0,
-            y: 0,
-
-            width:
-                background.width,
-
-            height:
-                background.height,
-        }
-    );
-
-
-    // ========================================================
-    // 5. Fonts
-    // ========================================================
-
-    const regularFont =
-        await pdfDoc.embedFont(
-            StandardFonts.Helvetica
-        );
-
-
-    const boldFont =
-        await pdfDoc.embedFont(
-            StandardFonts.HelveticaBold
-        );
-
-
-    // ========================================================
-    // 6. Certificate title
-    // ========================================================
-
-    drawCenteredText(
-        page,
-
-        "ENROLLMENT CONFIRMATION",
-
-        boldFont,
-
-        28,
-
-        1535
-    );
-
-
-    // ========================================================
-    // 7. Greeting
-    // ========================================================
-
-    page.drawText(
-        `Dear ${cleanName},`,
-        {
-            x: 150,
-
-            y: 1435,
-
-            size: 17,
-
-            font:
-                regularFont,
-
-            color:
-                textColor,
-        }
-    );
-
-
-    // ========================================================
-    // 8. Formal paragraph
-    // ========================================================
-
-    const paragraphLines = [
-
-        "This is to certify that the above-named individual has been",
-
-        "officially enrolled as a member of the Association for",
-
-        "Computing Machinery (ACM), Department of Computer",
-
-        "Science and Engineering.",
-
-    ];
-
-
-    let paragraphY = 1390;
-
-
-    for (
-        const line
-        of paragraphLines
-    ) {
-
-        drawCenteredText(
-            page,
-
-            line,
-
-            regularFont,
-
-            15,
-
-            paragraphY
-        );
-
-
-        paragraphY -= 25;
+    // 1. Determine verification URL
+    let baseUrl = process.env.VERIFICATION_BASE_URL || process.env.BACKEND_URL;
+    if (!baseUrl || baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
+        const localIp = getLocalNetworkIp();
+        const port = process.env.PORT || 5000;
+        baseUrl = `http://${localIp}:${port}`;
     }
 
+    const verificationUrl = `${baseUrl}/verify/${aceId}`;
 
-    // ========================================================
-    // 9. Submitted Details heading
-    // ========================================================
+    // 2. Read template background image
+    const templatePath = path.join(process.cwd(), "templates", "acm_id_card_bg.png");
+    const templateBytes = await fs.readFile(templatePath);
 
-    drawCenteredText(
-        page,
+    // 3. Generate high-resolution QR code PNG buffer (styled in dark navy #022e6e to match template theme)
+    const qrBuffer = await QRCode.toBuffer(verificationUrl, {
+        width: 320,
+        margin: 1,
+        errorCorrectionLevel: "H",
+        color: {
+            dark: "#022e6e",
+            light: "#ffffff",
+        },
+    });
 
-        "SUBMITTED DETAILS",
+    // 4. Create PDF Document matching the exact dimensions of the template (1024 x 645)
+    const pdfDoc = await PDFDocument.create();
+    const bgImage = await pdfDoc.embedPng(templateBytes);
+    const qrImage = await pdfDoc.embedPng(qrBuffer);
 
-        boldFont,
+    const pageWidth = bgImage.width; // 1024
+    const pageHeight = bgImage.height; // 645
+    const page = pdfDoc.addPage([pageWidth, pageHeight]);
 
-        20,
+    // Draw Background Template
+    page.drawImage(bgImage, {
+        x: 0,
+        y: 0,
+        width: pageWidth,
+        height: pageHeight,
+    });
 
-        1240
-    );
+    // 5. Draw QR Code centered inside the left designated rounded box
+    // Blue frame: X=[68, 245], width=177 | Y=[222, 403], height=181
+    // Box center: X=156.5, Y=312.5. With qrSize=156, padding is ~10.5px on all sides.
+    const qrSize = 156;
+    const qrX = 78.5;
+    const qrY = 234.5;
 
+    page.drawImage(qrImage, {
+        x: qrX,
+        y: qrY,
+        width: qrSize,
+        height: qrSize,
+    });
 
-    // ========================================================
-    // 10. Single-column participant details with clear font hierarchy
-    // ========================================================
+    // 6. Fonts and Typography
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    const detailsX = 180;
-    const detailsGap = 52;
-    let detailsY = 1175;
+    // Exact Dark Navy text color matching template typography (#022e6e)
+    const textColor = rgb(2 / 255, 46 / 255, 110 / 255);
+    const startX = 535; // Colons end at X=515; 20px clean margin
 
-    // ACM Reg. No (KEY FIELD - BIG & BOLD)
-    drawLabelValue(
-        page,
-        "ACM Reg. No",
-        cleanAceId,
-        detailsX,
-        detailsY,
-        boldFont,
-        boldFont,
-        {
-            labelSize: 20,
-            valueSize: 22,
-        }
-    );
+    // Row 1: Name (Colon center PDF Y = 322.5)
+    const cleanName = String(name || "")
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+    let nameFontSize = 18;
+    if (cleanName.length > 28) nameFontSize = 13;
+    else if (cleanName.length > 20) nameFontSize = 15;
+    const nameY = 322.5 - (0.359 * nameFontSize);
 
-    detailsY -= detailsGap;
+    page.drawText(cleanName, {
+        x: startX,
+        y: nameY,
+        size: nameFontSize,
+        font: boldFont,
+        color: textColor,
+    });
 
-    // Name (KEY FIELD - BIG & BOLD)
-    drawLabelValue(
-        page,
-        "Name",
-        cleanName,
-        detailsX,
-        detailsY,
-        boldFont,
-        boldFont,
-        {
-            labelSize: 20,
-            valueSize: 22,
-        }
-    );
+    // Row 2: ACM Regd. No. (Colon center PDF Y = 269)
+    const cleanRegNo = String(aceId || "N/A").trim();
+    const regFontSize = 18;
+    const regY = 269 - (0.359 * regFontSize);
 
-    detailsY -= detailsGap;
+    page.drawText(cleanRegNo, {
+        x: startX,
+        y: regY,
+        size: regFontSize,
+        font: boldFont,
+        color: textColor,
+    });
 
-    // Department (KEY FIELD - BIG & BOLD)
-    drawLabelValue(
-        page,
-        "Department",
-        cleanBranch,
-        detailsX,
-        detailsY,
-        boldFont,
-        boldFont,
-        {
-            labelSize: 19,
-            valueSize: 20,
-        }
-    );
+    // Row 3: Department (Colon center PDF Y = 216)
+    const isLateral = String(mode || "").toLowerCase() === "lateral";
+    const deptInfo = `${branch || ""}${isLateral ? " (Lateral)" : ""}`.trim();
+    let deptFontSize = 16;
+    if (deptInfo.length > 36) deptFontSize = 11.5;
+    else if (deptInfo.length > 28) deptFontSize = 13.5;
+    else if (deptInfo.length > 22) deptFontSize = 14.5;
+    const deptY = 216 - (0.359 * deptFontSize);
 
-    detailsY -= detailsGap;
+    page.drawText(deptInfo, {
+        x: startX,
+        y: deptY,
+        size: deptFontSize,
+        font: boldFont,
+        color: textColor,
+    });
 
-    // Year of Study (KEY FIELD - BIG & BOLD)
-    drawLabelValue(
-        page,
-        "Year of Study",
-        cleanYear,
-        detailsX,
-        detailsY,
-        boldFont,
-        boldFont,
-        {
-            labelSize: 19,
-            valueSize: 20,
-        }
-    );
+    // 7. Save and Return Output Path
+    const pdfBytes = await pdfDoc.save();
 
-    detailsY -= detailsGap;
+    const generatedDir = path.join(process.cwd(), "generated");
+    await fs.mkdir(generatedDir, { recursive: true });
 
-    // Phone Number (Secondary Field)
-    drawLabelValue(
-        page,
-        "Phone Number",
-        cleanPhone,
-        detailsX,
-        detailsY,
-        boldFont,
-        regularFont,
-        {
-            labelSize: 16,
-            valueSize: 16,
-        }
-    );
-
-    detailsY -= detailsGap;
-
-    // Email (Secondary Field)
-    drawLabelValue(
-        page,
-        "Email",
-        cleanEmail,
-        detailsX,
-        detailsY,
-        boldFont,
-        regularFont,
-        {
-            labelSize: 16,
-            valueSize: 16,
-            maxWidth: 1100,
-        }
-    );
-
-    detailsY -= detailsGap;
-
-    // Gender (Secondary Field)
-    drawLabelValue(
-        page,
-        "Gender",
-        cleanGender,
-        detailsX,
-        detailsY,
-        boldFont,
-        regularFont,
-        {
-            labelSize: 16,
-            valueSize: 16,
-        }
-    );
-
-    detailsY -= detailsGap;
-
-    // Goodies (Secondary Field)
-    drawLabelValue(
-        page,
-        "Goodies",
-        cleanGoodies,
-        detailsX,
-        detailsY,
-        boldFont,
-        regularFont,
-        {
-            labelSize: 16,
-            valueSize: 16,
-        }
-    );
-
-    detailsY -= detailsGap;
-
-    // Payment Mode (Secondary Field)
-    drawLabelValue(
-        page,
-        "Payment Mode",
-        cleanPayment,
-        detailsX,
-        detailsY,
-        boldFont,
-        regularFont,
-        {
-            labelSize: 16,
-            valueSize: 16,
-        }
-    );
-
-    detailsY -= detailsGap;
-
-    // Type of Registration (Secondary Field)
-    drawLabelValue(
-        page,
-        "Type of Registration",
-        cleanRegType,
-        detailsX,
-        detailsY,
-        boldFont,
-        regularFont,
-        {
-            labelSize: 16,
-            valueSize: 16,
-        }
-    );
-
-
-    // ========================================================
-    // 11. Embed signatures
-    // ========================================================
-
-    const hodSignature =
-        await pdfDoc.embedPng(
-            hodSignatureBytes
-        );
-
-
-    const secretarySignature =
-        await pdfDoc.embedPng(
-            secretarySignatureBytes
-        );
-
-
-    // ========================================================
-    // 12. Signature blocks
-    // ========================================================
-
-    const signatureWidth = 180;
-
-    const signatureY = 390;
-
-
-    // HOD
-    drawSignatureBlock(
-        page,
-
-        hodSignature,
-
-        300,
-
-        signatureY,
-
-        signatureWidth,
-
-        "Head of CSE Department",
-
-        boldFont
-    );
-
-
-    // ACM Secretary
-    drawSignatureBlock(
-        page,
-
-        secretarySignature,
-
-        1110,
-
-        signatureY,
-
-        signatureWidth,
-
-        "ACM Secretary",
-
-        boldFont
-    );
-
-
-    // ========================================================
-    // 13. Generate PDF bytes
-    // ========================================================
-
-    const pdfBytes =
-        await pdfDoc.save();
-
-
-    // ========================================================
-    // 14. Temporary generated folder
-    // ========================================================
-
-    const generatedDir =
-        getAssetPath(
-            "generated"
-        );
-
-
-    await fs.mkdir(
+    const outputPath = path.join(
         generatedDir,
-        {
-            recursive: true,
-        }
+        `ACM_Certificate_${String(aceId || "Membership").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`
     );
 
-
-    // ========================================================
-    // 15. Safe filename
-    // ========================================================
-
-    const safeName =
-        String(name)
-
-            .normalize("NFKD")
-
-            .replace(
-                /[<>:"/\\|?*\x00-\x1F]/g,
-                ""
-            )
-
-            .trim()
-
-            ||
-            "participant";
-
-
-    const safeAceId =
-        String(aceId || "ACE")
-
-            .replace(
-                /[^a-zA-Z0-9_-]/g,
-                ""
-            );
-
-
-    const outputPath =
-        path.join(
-            generatedDir,
-
-            `${safeAceId}-${safeName}.pdf`
-        );
-
-
-    // ========================================================
-    // 16. Save PDF
-    // ========================================================
-
-    await fs.writeFile(
-        outputPath,
-        pdfBytes
-    );
-
-
-    console.log(
-        `Certificate generated: ${outputPath}`
-    );
-
+    await fs.writeFile(outputPath, pdfBytes);
 
     return outputPath;
 };
