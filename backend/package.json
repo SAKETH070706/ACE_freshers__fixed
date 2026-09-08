@@ -15,9 +15,9 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
     "joi": "^18.2.3",
     "mongoose": "^9.9.1",
-    "nodemailer": "^10.0.0",
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {

@@ -42,13 +42,14 @@ export const errorMiddleware = (
     const statusCode =
         error.statusCode || 500;
 
+    const isProd = process.env.NODE_ENV === "production";
+    const message =
+        isProd && statusCode === 500
+            ? "Internal server error."
+            : error.message || "Internal server error.";
+
     res.status(statusCode).json({
-
         success: false,
-
-        message:
-            error.message ||
-            "Internal server error."
-
+        message,
     });
 };

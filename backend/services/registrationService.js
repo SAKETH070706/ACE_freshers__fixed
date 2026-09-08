@@ -1,7 +1,7 @@
 import Registration from "../models/Registration.js";
 import { sendWelcomeEmailWithRetry } from "./emailService.js";
 import { generateAceId } from "./aceIdService.js";
-import { generateCertificate } from "./certificateService.js";
+import { generateCertificate, cleanupCertificate } from "./certificateService.js";
 
 export const registerUser = async (data) => {
 
@@ -119,6 +119,10 @@ export const registerUser = async (data) => {
         );
 
         registration.emailStatus = "Failed";
+    } finally {
+        if (certificatePath) {
+            await cleanupCertificate(certificatePath);
+        }
     }
 
 

@@ -8,13 +8,18 @@ import {
 } from "pdf-lib";
 
 
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 // ============================================================
-// Asset Path
+// Asset Path (resolved relative to backend directory)
 // ============================================================
 
 const getAssetPath = (...paths) => {
-    return path.join(
-        process.cwd(),
+    return path.resolve(
+        __dirname,
+        "..",
         ...paths
     );
 };
@@ -239,6 +244,64 @@ const drawSignatureBlock = (
 };
 
 
+// In-memory cache for static template and signature image assets
+let cachedAssets = null;
+
+const loadCertificateAssets = async () => {
+    if (cachedAssets) {
+        return cachedAssets;
+    }
+
+    const templatePath =
+        getAssetPath(
+            "templates",
+            "certificate-bg.jpg"
+        );
+
+    const hodSignaturePath =
+        getAssetPath(
+            "signatures",
+            "hod_sign.png"
+        );
+
+    const secretarySignaturePath =
+        getAssetPath(
+            "signatures",
+            "sec_sign.png"
+        );
+
+    const [
+        templateBytes,
+        hodSignatureBytes,
+        secretarySignatureBytes,
+    ] = await Promise.all([
+        fs.readFile(templatePath),
+        fs.readFile(hodSignaturePath),
+        fs.readFile(secretarySignaturePath),
+    ]);
+
+    cachedAssets = {
+        templateBytes,
+        hodSignatureBytes,
+        secretarySignatureBytes,
+    };
+
+    return cachedAssets;
+};
+
+// Sanitize string to WinAnsi supported characters so pdf-lib never throws
+const sanitizeWinAnsi = (str) => {
+    if (!str) return "";
+    return String(str)
+        .normalize("NFKD")
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/[\u2013\u2014]/g, "-")
+        .replace(/[^\x20-\x7E\xA0-\xFF]/g, "")
+        .trim();
+};
+
+
 // ============================================================
 // Generate Certificate
 // ============================================================
@@ -255,53 +318,27 @@ export const generateCertificate = async ({
     payment,
     goodies,
 }) => {
+    // Sanitize user inputs for WinAnsi standard font
+    const cleanName = sanitizeWinAnsi(name);
+    const cleanEmail = sanitizeWinAnsi(email);
+    const cleanPhone = sanitizeWinAnsi(phone);
+    const cleanAceId = sanitizeWinAnsi(aceId);
+    const cleanBranch = sanitizeWinAnsi(branch);
+    const cleanGender = sanitizeWinAnsi(gender);
+    const cleanYear = sanitizeWinAnsi(year);
+    const cleanRegType = sanitizeWinAnsi(registrationType || "ACM India");
+    const cleanPayment = sanitizeWinAnsi(payment);
+    const cleanGoodies = sanitizeWinAnsi(goodies);
 
     // ========================================================
-    // 1. Asset paths
+    // 1. Read cached assets
     // ========================================================
 
-    const templatePath =
-        getAssetPath(
-            "templates",
-            "certificate-bg.jpg"
-        );
-
-
-    const hodSignaturePath =
-        getAssetPath(
-            "signatures",
-            "hod_sign.png"
-        );
-
-
-    const secretarySignaturePath =
-        getAssetPath(
-            "signatures",
-            "sec_sign.png"
-        );
-
-
-    // ========================================================
-    // 2. Read assets
-    // ========================================================
-
-    const [
+    const {
         templateBytes,
         hodSignatureBytes,
         secretarySignatureBytes,
-    ] = await Promise.all([
-        fs.readFile(
-            templatePath
-        ),
-
-        fs.readFile(
-            hodSignaturePath
-        ),
-
-        fs.readFile(
-            secretarySignaturePath
-        ),
-    ]);
+    } = await loadCertificateAssets();
 
 
     // ========================================================
@@ -382,7 +419,7 @@ export const generateCertificate = async ({
     // ========================================================
 
     page.drawText(
-        `Dear ${name},`,
+        `Dear ${cleanName},`,
         {
             x: 150,
 
@@ -470,7 +507,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "ACM Reg. No",
-        aceId,
+        cleanAceId,
         detailsX,
         detailsY,
         boldFont,
@@ -487,7 +524,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "Name",
-        name,
+        cleanName,
         detailsX,
         detailsY,
         boldFont,
@@ -504,7 +541,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "Department",
-        branch,
+        cleanBranch,
         detailsX,
         detailsY,
         boldFont,
@@ -521,7 +558,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "Year of Study",
-        year,
+        cleanYear,
         detailsX,
         detailsY,
         boldFont,
@@ -538,7 +575,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "Phone Number",
-        phone,
+        cleanPhone,
         detailsX,
         detailsY,
         boldFont,
@@ -555,7 +592,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "Email",
-        email,
+        cleanEmail,
         detailsX,
         detailsY,
         boldFont,
@@ -573,7 +610,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "Gender",
-        gender,
+        cleanGender,
         detailsX,
         detailsY,
         boldFont,
@@ -590,7 +627,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "Goodies",
-        goodies,
+        cleanGoodies,
         detailsX,
         detailsY,
         boldFont,
@@ -607,7 +644,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "Payment Mode",
-        payment,
+        cleanPayment,
         detailsX,
         detailsY,
         boldFont,
@@ -624,7 +661,7 @@ export const generateCertificate = async ({
     drawLabelValue(
         page,
         "Type of Registration",
-        registrationType || "ACM India",
+        cleanRegType,
         detailsX,
         detailsY,
         boldFont,
@@ -776,4 +813,14 @@ export const generateCertificate = async ({
 
 
     return outputPath;
+};
+
+export const cleanupCertificate = async (filePath) => {
+    try {
+        if (filePath) {
+            await fs.unlink(filePath).catch(() => {});
+        }
+    } catch (e) {
+        console.warn(`Failed to cleanup certificate ${filePath}:`, e.message);
+    }
 };

@@ -13,10 +13,9 @@ const PORT = process.env.PORT || 5000;
     it later when the first registration or admin login fails.
 */
 const REQUIRED_ENV_VARS = [
-    "PORT",
   "MONGO_URI",
-  "BREVO_API_KEY",      // <-- Keep this
-  "BREVO_SENDER_EMAIL", // <-- Keep this
+  "BREVO_API_KEY",
+  "BREVO_SENDER_EMAIL",
   "WHATSAPP_1ST_YEAR_LINK",
   "WHATSAPP_2ND_YEAR_LINK",
 ];
@@ -35,10 +34,16 @@ if (missingEnvVars.length > 0) {
 
 }
 
-dns.setServers([
-    "8.8.8.8",
-    "8.8.4.4"
-]);
+if (!process.env.BACKEND_URL) {
+    process.env.BACKEND_URL = `http://localhost:${PORT}`;
+}
+
+if (process.env.USE_CUSTOM_DNS === "true") {
+    dns.setServers([
+        "8.8.8.8",
+        "8.8.4.4"
+    ]);
+}
 
 const startServer = async () => {
 

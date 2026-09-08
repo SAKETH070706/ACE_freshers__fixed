@@ -2247,6 +2247,35 @@ select option {
     font-size: 12.5px;
 }
 
+.marvel-hero-id-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+    padding: 6px 14px;
+    background: rgba(37, 99, 235, 0.25);
+    border: 1.5px solid rgba(56, 189, 248, 0.6);
+    border-radius: 8px;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+}
+
+.marvel-hero-id-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #93c5fd;
+    text-transform: uppercase;
+}
+
+.marvel-hero-id-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    color: #38bdf8;
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}
+
 .toast-progress.marvel-progress {
     background: linear-gradient(90deg, #2563eb, #38bdf8, #60a5fa);
 }

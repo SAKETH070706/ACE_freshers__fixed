@@ -31,32 +31,44 @@ const getAceIdConfig = async () => {
         First ever registration.
 
         Frequencies are generated ONCE
-        and stored permanently in MongoDB.
+        and stored permanently in MongoDB,
+        then extended dynamically on each batch exhaustion.
     */
 
     if (!config) {
 
-        config = await AceIdConfig.create({
+        try {
+            config = await AceIdConfig.create({
 
-            name: "aceIdConfig",
+                name: "aceIdConfig",
 
-            frequencies: {
-                A: randomFrequency(),
-                B: randomFrequency(),
-                C: randomFrequency(),
-                D: randomFrequency(),
-            },
+                frequencies: {
+                    A: randomFrequency(),
+                    B: randomFrequency(),
+                    C: randomFrequency(),
+                    D: randomFrequency(),
+                },
 
-            counters: {
-                A: 0,
-                B: 0,
-                C: 0,
-                D: 0,
-            },
+                counters: {
+                    A: 0,
+                    B: 0,
+                    C: 0,
+                    D: 0,
+                },
 
-            currentLetter: "A",
+                currentLetter: "A",
 
-        });
+            });
+        } catch (err) {
+            // If another concurrent request created the config first
+            if (err.code === 11000) {
+                config = await AceIdConfig.findOne({
+                    name: "aceIdConfig",
+                });
+            } else {
+                throw err;
+            }
+        }
 
     }
 
@@ -121,6 +133,9 @@ export const generateAceId = async () => {
                 LETTERS[nextIndex];
 
 
+            const newFrequency =
+                frequency + randomFrequency();
+
             const switched =
                 await AceIdConfig.findOneAndUpdate(
                     {
@@ -138,6 +153,9 @@ export const generateAceId = async () => {
                         $set: {
                             currentLetter:
                                 nextLetter,
+
+                            [`frequencies.${currentLetter}`]:
+                                newFrequency,
                         },
                     },
                     {

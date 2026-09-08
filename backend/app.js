@@ -16,17 +16,22 @@ const app = express();
 */
 const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
     .split(",")
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
     .filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow non-browser requests (no Origin header, e.g. curl/Postman)
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin) {
       return callback(null, true);
     }
 
-    return callback(new Error("Not allowed by CORS"));
+    const normalizedOrigin = origin.replace(/\/+$/, "");
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(null, false);
   },
   credentials: true,
 }));

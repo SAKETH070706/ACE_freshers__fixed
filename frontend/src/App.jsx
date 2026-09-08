@@ -206,6 +206,7 @@ function App() {
 
     const [toastData, setToastData] = useState({
         name: "",
+        aceId: "",
         message: "",
         emailStatus: "",
     });
@@ -526,7 +527,7 @@ function App() {
             */
 
             const emailUsername =
-                formData.email.trim().toLowerCase();
+                formData.email.trim().toLowerCase().replace(/@.*$/, "");
 
             const email =
                 `${emailUsername}@gmail.com`;
@@ -542,6 +543,7 @@ function App() {
 
             setToastData({
                 name: formData.name,
+                aceId: response.aceId || "",
                 message: response.message,
                 emailStatus: response.emailStatus,
             });
@@ -700,6 +702,13 @@ function App() {
                         <strong>
                             Freshers Assembled! Welcome to ACM, {toastData.name}.
                         </strong>
+
+                        {toastData.aceId && (
+                            <div className="marvel-hero-id-box">
+                                <span className="marvel-hero-id-label">MEMBER / PASS ID</span>
+                                <span className="marvel-hero-id-code">{toastData.aceId}</span>
+                            </div>
+                        )}
 
                         <p className="marvel-toast-sub">
                             Your official ACM 2026 Hero Pass has been issued successfully.
@@ -1234,7 +1243,7 @@ function App() {
                                 <input
                                     type="radio"
                                     name="year"
-                                    value="2nd Year"
+                                    value="2nd Year L.E"
                                     checked={
                                         formData.year ===
                                         "2nd Year L.E"

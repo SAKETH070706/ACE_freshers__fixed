@@ -86,6 +86,17 @@ export const sendWelcomeEmail = async ({
     </div>
   `;
 
+  const emailBody = {
+    sender: { name: "ACM Student Chapter", email: process.env.BREVO_SENDER_EMAIL },
+    to: [{ email, name }],
+    subject: "🎉 Official Member of ACM - Certificate & Registration Confirmation",
+    htmlContent,
+  };
+
+  if (attachments.length > 0) {
+    emailBody.attachment = attachments;
+  }
+
   // 4. Send directly via Brevo REST API (HTTPS port 443)
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -94,13 +105,7 @@ export const sendWelcomeEmail = async ({
       "Content-Type": "application/json",
       "Accept": "application/json",
     },
-    body: JSON.stringify({
-      sender: { name: "ACM Student Chapter", email: process.env.BREVO_SENDER_EMAIL },
-      to: [{ email, name }],
-      subject: "🎉 Official Member of ACM - Certificate & Registration Confirmation",
-      htmlContent,
-      attachment: attachments,
-    }),
+    body: JSON.stringify(emailBody),
   });
 
   if (!response.ok) {
