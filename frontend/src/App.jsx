@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, Fragment } from "react";
 import { registerParticipant } from "./services/registrationApi";
+import LoginPage from "./components/LoginPage";
+import { getStoredAuthToken, clearStoredAuthToken, verifySession } from "./services/authApi";
 import "./index.css";
 
 import aceLogo from "./assets/ace-logo.png";
@@ -144,6 +146,33 @@ function App() {
     const toastAutoTimerRef = useRef(null);
     const toastExitTimerRef = useRef(null);
 
+
+    /* =====================================================
+       AUTHENTICATION STATE
+    ===================================================== */
+
+    const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        return !!getStoredAuthToken();
+    });
+
+    useEffect(() => {
+        let isMounted = true;
+        const checkAuth = async () => {
+            const token = getStoredAuthToken();
+            if (token) {
+                const isValid = await verifySession(token);
+                if (!isValid && isMounted) {
+                    setIsAuthenticated(false);
+                }
+            } else if (isMounted) {
+                setIsAuthenticated(false);
+            }
+        };
+        checkAuth();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     /* =====================================================
        HEADER & ROUTING STATE
@@ -586,6 +615,30 @@ function App() {
        UI
     ===================================================== */
 
+    if (!isAuthenticated) {
+        return (
+            <div className="app">
+                {/* ELEGANT COSMIC ASTEROID SHOWER BACKGROUND */}
+                <div className="asteroid-container" aria-hidden="true">
+                    <div className="asteroid asteroid-1" />
+                    <div className="asteroid asteroid-2" />
+                    <div className="asteroid asteroid-3" />
+                    <div className="asteroid asteroid-4" />
+                    <div className="asteroid asteroid-5" />
+                    <div className="asteroid asteroid-6" />
+                    <div className="asteroid asteroid-7" />
+                    <div className="asteroid asteroid-8" />
+                    <div className="asteroid asteroid-9" />
+                    <div className="asteroid asteroid-10" />
+                    <div className="asteroid asteroid-11" />
+                    <div className="asteroid asteroid-12" />
+                </div>
+
+                <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />
+            </div>
+        );
+    }
+
     return (
 
         <div className="app">
@@ -658,6 +711,21 @@ function App() {
 
                         <button onClick={scrollToForm}>
                             Register
+                        </button>
+
+                        <button
+                            className="header-lock-btn"
+                            onClick={() => {
+                                clearStoredAuthToken();
+                                setIsAuthenticated(false);
+                            }}
+                            title="Lock Portal Session"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                            <span>Lock</span>
                         </button>
 
                     </nav>

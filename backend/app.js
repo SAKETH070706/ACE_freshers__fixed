@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 dotenv.config();
 import registerRoutes from "./routes/registerRoutes.js";
 import verifyRoutes from "./routes/verifyRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 import { errorMiddleware } from "./middleware/errorMiddleware.js";
 
 const app = express();
@@ -59,6 +60,10 @@ app.get("/", (req, res) => {
     });
 });
 
+app.use(
+    "/api/auth",
+    authRoutes
+);
 app.use(
     "/api/registrations",
     registerRoutes

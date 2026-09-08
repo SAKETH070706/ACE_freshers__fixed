@@ -274,7 +274,7 @@ export const sendWelcomeEmail = async ({
         <!-- FOOTER -->
         <div style="
           background-color: #075bbb;
-          padding: 25px 20px;
+          padding: 15px 20px;
           text-align: center;
         ">
 
