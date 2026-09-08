@@ -4,262 +4,496 @@ import { generateCertificate } from "./certificateService.js";
 
 dotenv.config();
 
-const formatTitleCase = (str) => {
-  if (!str) return "";
-  return String(str)
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-};
-
 export const sendWelcomeEmail = async ({
-  name: rawName,
+  name,
   email,
   phone,
   aceId,
   branch,
   gender,
   year,
-  mode = "Normal",
   payment,
   goodies,
-  registrationType = "ACM India",
-  certificatePath: existingCertPath = null,
 }) => {
-  const name = formatTitleCase(rawName);
-
-  // Generate certificate if not provided
-  let certificatePath = existingCertPath;
-  if (!certificatePath) {
-    certificatePath = await generateCertificate({
-      name,
-      email,
-      phone,
-      aceId,
-      branch,
-      gender,
-      year,
-      mode,
-      registrationType,
-      payment,
-      goodies,
-    });
-  }
+  // Generate certificate
+  const certificatePath = await generateCertificate({
+    name,
+    email,
+    phone,
+    aceId,
+    branch,
+    gender,
+    year,
+    payment,
+    goodies,
+  });
 
   // Certificate attachment
   const attachments = [];
+
   if (certificatePath && fs.existsSync(certificatePath)) {
     attachments.push({
       name: `ACM_Certificate_${aceId || "Membership"}.pdf`,
       content: fs.readFileSync(certificatePath).toString("base64"),
     });
-
-    try {
-      fs.unlinkSync(certificatePath);
-    } catch (e) {
-      // Ignored if already removed
-    }
   }
 
   // Social links from .env
-  let whatsappLink = process.env.WHATSAPP_COMMUNITY_LINK;
-  if (year === "1st Year" && process.env.WHATSAPP_1ST_YEAR_LINK) {
-    whatsappLink = process.env.WHATSAPP_1ST_YEAR_LINK;
-  } else if (year === "2nd Year" && process.env.WHATSAPP_2ND_YEAR_LINK) {
-    whatsappLink = process.env.WHATSAPP_2ND_YEAR_LINK;
-  }
-
+  const whatsappLink = process.env.WHATSAPP_COMMUNITY_LINK;
   const instagramLink = process.env.INSTAGRAM_URL;
   const youtubeLink = process.env.YOUTUBE_URL;
 
   // Header image from .env
   const headerImageUrl = process.env.EMAIL_HEADER_IMAGE_URL;
 
+  // Social icons from .env
+  const whatsappIconUrl = process.env.WHATSAPP_ICON_URL;
+  const instagramIconUrl = process.env.INSTAGRAM_ICON_URL;
+  const youtubeIconUrl = process.env.YOUTUBE_ICON_URL;
+
   // Validate environment variables
   if (!whatsappLink) {
-    throw new Error("WHATSAPP_COMMUNITY_LINK is not set in .env");
+    throw new Error(
+      "WHATSAPP_COMMUNITY_LINK is not set in .env"
+    );
   }
+
   if (!instagramLink) {
-    throw new Error("INSTAGRAM_URL is not set in .env");
+    throw new Error(
+      "INSTAGRAM_URL is not set in .env"
+    );
   }
+
   if (!youtubeLink) {
-    throw new Error("YOUTUBE_URL is not set in .env");
+    throw new Error(
+      "YOUTUBE_URL is not set in .env"
+    );
   }
+
   if (!headerImageUrl) {
-    throw new Error("EMAIL_HEADER_IMAGE_URL is not set in .env");
+    throw new Error(
+      "EMAIL_HEADER_IMAGE_URL is not set in .env"
+    );
   }
 
-  // Clean, standard light email layout
+  if (!whatsappIconUrl) {
+    throw new Error(
+      "WHATSAPP_ICON_URL is not set in .env"
+    );
+  }
+
+  if (!instagramIconUrl) {
+    throw new Error(
+      "INSTAGRAM_ICON_URL is not set in .env"
+    );
+  }
+
+  if (!youtubeIconUrl) {
+    throw new Error(
+      "YOUTUBE_ICON_URL is not set in .env"
+    );
+  }
+
+  // Email HTML
   const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="
-        margin: 0;
-        padding: 20px 10px;
-        background-color: #f4f5f7;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        color: #333333;
-        -webkit-font-smoothing: antialiased;
+    <div style="
+      margin: 0;
+      padding: 25px 12px;
+      background-color: #f5f5f5;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #333333;
+    ">
+
+      <div style="
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 14px;
+        overflow: hidden;
       ">
+
+        <!-- HEADER IMAGE -->
         <div style="
-          max-width: 600px;
-          margin: 0 auto;
-          background-color: #ffffff;
-          border-radius: 8px;
-          overflow: hidden;
-          border: 1px solid #e5e7eb;
+          width: 100%;
+          margin: 0;
+          padding: 0;
+          line-height: 0;
         ">
-          <!-- HEADER IMAGE -->
-          <div style="width: 100%; margin: 0; padding: 0; line-height: 0;">
-            <img
-              src="${headerImageUrl}"
-              alt="SRKR ACM"
-              style="display: block; width: 100%; height: auto; border: 0;"
-            />
-          </div>
+          <img
+            src="${headerImageUrl}"
+            alt="SRKR ACM"
+            style="
+              display: block;
+              width: 100%;
+              height: auto;
+              margin: 0;
+              padding: 0;
+              border: 0;
+            "
+          />
+        </div>
 
-          <!-- MAIN CONTENT -->
-          <div style="padding: 32px 28px;">
-            <h1 style="
-              margin: 0 0 20px;
-              font-size: 24px;
-              line-height: 1.3;
-              color: #111827;
+        <!-- MAIN CONTENT -->
+        <div style="
+          padding: 30px 25px;
+        ">
+
+          <h1 style="
+            margin: 0 0 20px;
+            font-size: 28px;
+            line-height: 1.2;
+            color: #222222;
+          ">
+            Welcome to SRKR ACM!
+          </h1>
+
+          <p style="
+            font-size: 15px;
+            line-height: 1.7;
+            color: #333333;
+            margin: 0 0 18px;
+          ">
+            Dear
+            <strong style="color: #222222;">
+              ${name}
+            </strong>,
+          </p>
+
+          <p style="
+            font-size: 15px;
+            line-height: 1.7;
+            color: #333333;
+            margin: 0 0 18px;
+          ">
+            Congratulations! Your registration for
+            <strong style="color: #222222;">
+              SRKR ACM
+            </strong>
+            has been successfully completed. 🎉
+          </p>
+
+          <p style="
+            font-size: 15px;
+            line-height: 1.7;
+            color: #333333;
+            margin: 0 0 28px;
+          ">
+            Your journey starts here. Get ready to
+            <strong style="color: #222222;">
+              Learn, Build & Grow.
+            </strong>
+            🚀
+          </p>
+
+          <!-- WHAT YOU'LL GAIN -->
+          <h2 style="
+            margin: 0 0 18px;
+            font-size: 22px;
+            color: #222222;
+          ">
+            What You’ll Gain
+          </h2>
+
+          <ul style="
+            margin: 0 0 30px;
+            padding-left: 22px;
+            color: #333333;
+            font-size: 15px;
+            line-height: 1.8;
+          ">
+
+            <li style="
+              margin-bottom: 8px;
             ">
-              Welcome to SRKR ACM!
-            </h1>
+              Hands-on exposure 
+            </li>
 
-            <p style="font-size: 15px; line-height: 1.6; color: #374151; margin: 0 0 16px;">
-              Dear <strong>${name}</strong>,
-            </p>
-
-            <p style="font-size: 15px; line-height: 1.6; color: #374151; margin: 0 0 24px;">
-              Congratulations! Your registration for <strong>SRKR ACM</strong> has been successfully completed. 🎉
-            </p>
-
-            <!-- MEMBERSHIP DETAILS LIST (NO TABLE) -->
-            <div style="
-              background-color: #f8fafc;
-              border: 1px solid #e2e8f0;
-              border-left: 4px solid #0284c7;
-              border-radius: 6px;
-              padding: 16px 20px;
-              margin: 0 0 24px;
+            <li style="
+              margin-bottom: 8px;
             ">
-              <h3 style="
-                margin: 0 0 12px;
-                font-size: 14px;
-                color: #0369a1;
-                letter-spacing: 0.5px;
-                text-transform: uppercase;
-              ">
-                Official Membership Details
-              </h3>
-              <ul style="list-style: none; padding: 0; margin: 0; font-size: 14px; line-height: 1.8; color: #475569;">
-                <li><strong>ACM Regd. No:</strong> <span style="color: #0284c7; font-weight: 600;">${aceId}</span></li>
-                <li><strong>Department:</strong> ${branch}</li>
-                <li><strong>Year of Study:</strong> ${year}</li>
-                <li><strong>Admission Mode:</strong> ${mode || "Normal"}</li>
-                <li><strong>Registration Type:</strong> ${registrationType}</li>
-                <li><strong>Payment Mode:</strong> ${payment}</li>
-              </ul>
-            </div>
+              Practical knowledge
+            </li>
 
-            <p style="font-size: 15px; line-height: 1.6; color: #374151; margin: 0 0 24px;">
-              Your journey starts here. Get ready to <strong>Learn, Build & Grow</strong>. 🚀
-            </p>
-
-            <h2 style="margin: 0 0 14px; font-size: 17px; color: #111827;">
-              What You’ll Gain
-            </h2>
-
-            <ul style="
-              margin: 0 0 24px;
-              padding-left: 20px;
-              color: #4b5563;
-              font-size: 14.5px;
-              line-height: 1.7;
+            <li style="
+              margin-bottom: 8px;
             ">
-              <li style="margin-bottom: 6px;">Hands-on exposure through coding bootcamps & hackathons</li>
-              <li style="margin-bottom: 6px;">Practical computing knowledge and real-world tech stacks</li>
-              <li style="margin-bottom: 6px;">Teamwork, leadership & peer collaboration opportunities</li>
-              <li style="margin-bottom: 6px;">Mentorship from senior developers and alumni network</li>
-              <li>Direct access to ACM national & international events</li>
-            </ul>
+              Teamwork & collaboration 
+            </li>
 
-            <p style="margin: 0 0 14px; font-size: 14px; line-height: 1.6; color: #4b5563;">
-              📎 <em>Your official digital membership ID card is attached to this email with a verifiable QR code.</em>
-            </p>
+            <li style="
+              margin-bottom: 8px;
+            ">
+              Problem-solving skills 
+            </li>
 
-            <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #374151;">
-              Let’s learn, build, and grow together.
-            </p>
-          </div>
+            <li>
+              Opportunities to learn 
+            </li>
 
-          <!-- FOOTER -->
-          <div style="
-            background-color: #f8fafc;
-            border-top: 1px solid #e5e7eb;
-            padding: 24px 20px;
+          </ul>
+
+          <!-- CERTIFICATE NOTE -->
+          <p style="
+            margin: 0 0 20px;
+            font-size: 15px;
+            line-height: 1.7;
+            color: #333333;
+          ">
+            Your official digital membership certificate is attached to this
+            email. It contains your membership details along with a
+            <strong style="color: #222222;">
+              verifiable QR code
+            </strong>.
+          </p>
+
+          <!-- CLOSING -->
+          <p style="
+            margin: 0 0 18px;
+            font-size: 15px;
+            line-height: 1.7;
+            color: #333333;
+          ">
+            We’re excited to have you as part of
+            <strong style="color: #222222;">
+              SRKR ACM!
+            </strong>
+            ✨
+          </p>
+
+          <p style="
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.7;
+            color: #333333;
+          ">
+            Let’s learn, build, and grow together.
+          </p>
+
+        </div>
+
+        <!-- FOOTER -->
+        <div style="
+          background-color: #075bbb;
+          padding: 25px 20px;
+          text-align: center;
+        ">
+
+          <p style="
+            margin: 0 0 18px;
+            padding: 0;
+            font-size: 14px;
+            line-height: 20px;
+            color: #ffffff;
             text-align: center;
           ">
-            <p style="margin: 0 0 12px; font-size: 13px; font-weight: 600; color: #4b5563;">
-              Stay Connected
-            </p>
+            Stay Connected With Us
+          </p>
 
-            <p style="margin: 0 0 16px; font-size: 13px; color: #0284c7;">
-              <a href="${whatsappLink}" target="_blank" style="color: #0284c7; text-decoration: underline; margin: 0 8px;">WhatsApp Community</a> |
-              <a href="${instagramLink}" target="_blank" style="color: #0284c7; text-decoration: underline; margin: 0 8px;">Instagram</a> |
-              <a href="${youtubeLink}" target="_blank" style="color: #0284c7; text-decoration: underline; margin: 0 8px;">YouTube</a>
-            </p>
+          <!-- SOCIAL ICONS -->
+          <table
+            role="presentation"
+            border="0"
+            cellpadding="0"
+            cellspacing="0"
+            width="240"
+            align="center"
+            style="
+              width: 240px;
+              margin: 0 auto 20px;
+              border-collapse: collapse;
+              border-spacing: 0;
+            "
+          >
+            <tr>
 
-            <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-              © 2026 SRKR ACM Student Chapter. All rights reserved.
-            </p>
-          </div>
+              <!-- WHATSAPP -->
+              <td
+                align="center"
+                valign="middle"
+                width="80"
+                style="
+                  width: 80px;
+                  padding: 0;
+                  text-align: center;
+                  vertical-align: middle;
+                "
+              >
+                <a
+                  href="${whatsappLink}"
+                  target="_blank"
+                  style="
+                    display: inline-block;
+                    text-decoration: none;
+                  "
+                >
+                  <img
+                    src="${whatsappIconUrl}"
+                    alt="WhatsApp"
+                    width="40"
+                    height="40"
+                    style="
+                      display: block;
+                      width: 40px;
+                      height: 40px;
+                      max-width: 40px;
+                      max-height: 40px;
+                      border: 0;
+                      margin: 0 auto;
+                    "
+                  />
+                </a>
+              </td>
+
+              <!-- INSTAGRAM -->
+              <td
+                align="center"
+                valign="middle"
+                width="80"
+                style="
+                  width: 80px;
+                  padding: 0;
+                  text-align: center;
+                  vertical-align: middle;
+                "
+              >
+                <a
+                  href="${instagramLink}"
+                  target="_blank"
+                  style="
+                    display: inline-block;
+                    text-decoration: none;
+                  "
+                >
+                  <img
+                    src="${instagramIconUrl}"
+                    alt="Instagram"
+                    width="40"
+                    height="40"
+                    style="
+                      display: block;
+                      width: 40px;
+                      height: 40px;
+                      max-width: 40px;
+                      max-height: 40px;
+                      border: 0;
+                      margin: 0 auto;
+                    "
+                  />
+                </a>
+              </td>
+
+              <!-- YOUTUBE -->
+              <td
+                align="center"
+                valign="middle"
+                width="80"
+                style="
+                  width: 80px;
+                  padding: 0;
+                  text-align: center;
+                  vertical-align: middle;
+                "
+              >
+                <a
+                  href="${youtubeLink}"
+                  target="_blank"
+                  style="
+                    display: inline-block;
+                    text-decoration: none;
+                  "
+                >
+                  <img
+                    src="${youtubeIconUrl}"
+                    alt="YouTube"
+                    width="40"
+                    height="40"
+                    style="
+                      display: block;
+                      width: 40px;
+                      height: 40px;
+                      max-width: 40px;
+                      max-height: 40px;
+                      border: 0;
+                      margin: 0 auto;
+                    "
+                  />
+                </a>
+              </td>
+
+            </tr>
+          </table>
+
+          <p style="
+            margin: 0;
+            padding: 0;
+            font-size: 13px;
+            line-height: 20px;
+            color: #ffffff;
+            text-align: center;
+          ">
+            © 2026 SRKR ACM
+          </p>
+
         </div>
-      </body>
-    </html>
+
+      </div>
+
+    </div>
   `;
 
   // Send email using Brevo
-  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "api-key": process.env.BREVO_API_KEY,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      sender: {
-        name: "SRKR ACM",
-        email: process.env.BREVO_SENDER_EMAIL,
-      },
-      to: [{ email, name }],
-      subject: "Welcome to SRKR ACM - Registration Confirmation",
-      htmlContent,
-      attachment: attachments,
-    }),
-  });
+  const response = await fetch(
+    "https://api.brevo.com/v3/smtp/email",
+    {
+      method: "POST",
 
+      headers: {
+        "api-key": process.env.BREVO_API_KEY,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+
+      body: JSON.stringify({
+        sender: {
+          name: "SRKR ACM",
+          email: process.env.BREVO_SENDER_EMAIL,
+        },
+
+        to: [
+          {
+            email,
+            name,
+          },
+        ],
+
+        subject:
+          "Welcome to SRKR ACM - Registration Confirmation",
+
+        htmlContent,
+
+        attachment: attachments,
+      }),
+    }
+  );
+
+  // Handle Brevo error
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Brevo API Error (${response.status}): ${errText}`);
+
+    throw new Error(
+      `Brevo API Error (${response.status}): ${errText}`
+    );
   }
 
   // Delete temporary certificate after sending
-  if (!existingCertPath && certificatePath && fs.existsSync(certificatePath)) {
+  if (certificatePath && fs.existsSync(certificatePath)) {
     try {
       fs.unlinkSync(certificatePath);
     } catch (error) {
-      console.error("Failed to delete temporary certificate:", error.message);
+      console.error(
+        "Failed to delete temporary certificate:",
+        error.message
+      );
     }
   }
 
@@ -267,18 +501,32 @@ export const sendWelcomeEmail = async ({
 };
 
 // Retry email sending
-export const sendWelcomeEmailWithRetry = async (payload, attempts = 3) => {
+export const sendWelcomeEmailWithRetry = async (
+  payload,
+  attempts = 3
+) => {
   for (let i = 1; i <= attempts; i++) {
     try {
       await sendWelcomeEmail(payload);
-      console.log(`✅ Welcome email sent to ${payload.email}`);
+
+      console.log(
+        `✅ Welcome email sent to ${payload.email}`
+      );
+
       return true;
     } catch (error) {
-      console.error(`❌ Email attempt ${i} failed for ${payload.email}:`, error.message);
+      console.error(
+        `❌ Email attempt ${i} failed for ${payload.email}:`,
+        error.message
+      );
+
       if (i < attempts) {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * i));
+        await new Promise(
+          (resolve) => setTimeout(resolve, 1000 * i)
+        );
       }
     }
   }
+
   return false;
 };
