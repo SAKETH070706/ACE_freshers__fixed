@@ -180,7 +180,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
                 {/* Footer Notes */}
                 <div className="login-footer">
-                    <p>Contact ACE coordinators if you don't have the pass key.</p>
+                    <p>Contact ACM coordinators if you don't have the pass key.</p>
                 </div>
             </div>
         </div>
