@@ -58,7 +58,7 @@ export default function LoginPage({ onLoginSuccess }) {
                     </div>
 
                     <h1 className="login-title">
-                        ACE <span className="highlight-text">Freshers Portal</span>
+                        ACM <span className="highlight-text">Freshers Portal</span>
                     </h1>
                     <p className="login-subtitle">
                         Association for Computing Machinery &bull; SRKR Engineering College
