@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Registration from "../models/Registration.js";
 
 // Format name into Title Case: "gopala krishna saketh" -> "Gopala Krishna Saketh"
@@ -21,7 +22,18 @@ export const verifyCertificate = async (req, res) => {
         }
 
         const cleanAceId = String(aceId).trim();
-        const registration = await Registration.findOne({ aceId: cleanAceId });
+        let registration = await Registration.findOne({ aceId: cleanAceId });
+
+        // Fallback: Check 2nd-Year (2025 batch) collection in the same database
+        if (!registration) {
+            registration = await mongoose.connection.db.collection("batch_2025").findOne({
+                $or: [
+                    { aceId: cleanAceId },
+                    { originalAceId: cleanAceId },
+                    { aceId: cleanAceId.toUpperCase() },
+                ],
+            });
+        }
 
         if (!registration) {
             return res.status(404).send(
@@ -33,13 +45,16 @@ export const verifyCertificate = async (req, res) => {
             ? new Date(registration.registeredAt)
             : new Date(registration.createdAt || Date.now());
 
-        // Validity: 4 Years for Local Body Chapter, 1 Year for ACM India
+        // Validity: If validityYears is explicitly specified (e.g. 2 for 2nd Year batch_2025), use it.
+        // Otherwise 4 Years for Local Body Chapter, 1 Year for ACM India
         const regType = String(registration.registrationType || "").trim().toLowerCase();
         const isLocalChapter = regType.includes("local");
-        const validityYears = isLocalChapter ? 4 : 1;
+        const validityYears = registration.validityYears || (isLocalChapter ? 4 : 1);
 
-        const validUntil = new Date(registrationDate);
-        validUntil.setFullYear(validUntil.getFullYear() + validityYears);
+        const validUntil = registration.validUntil ? new Date(registration.validUntil) : new Date(registrationDate);
+        if (!registration.validUntil) {
+            validUntil.setFullYear(validUntil.getFullYear() + validityYears);
+        }
 
         const now = new Date();
         const isValid = now <= validUntil;
@@ -57,11 +72,33 @@ export const verifyCertificate = async (req, res) => {
             return `${day} ${month} ${year}`;
         };
 
+        // Return JSON for Scanner API or programmatic calls
+        if (req.query.format === "json" || req.headers.accept?.includes("application/json") || req.baseUrl === "/api/verify") {
+            return res.status(200).json({
+                success: true,
+                valid: isValid,
+                data: {
+                    aceId: registration.aceId,
+                    name: formatTitleCase(registration.name),
+                    branch: registration.branch,
+                    year: registration.year || "2nd Year",
+                    mode: registration.mode || "Normal",
+                    registrationType: registration.registrationType || (isLocalChapter ? "Local Body Chapter" : "ACM India"),
+                    registrationDate: formatDate(registrationDate),
+                    validUntil: formatDate(validUntil),
+                    isValid,
+                    validityYears,
+                    daysRemaining,
+                    daysExpired,
+                },
+            });
+        }
+
         const html = renderVerificationPage({
             aceId: registration.aceId,
             name: formatTitleCase(registration.name),
             branch: registration.branch,
-            year: registration.year,
+            year: registration.year || "2nd Year",
             mode: registration.mode || "Normal",
             registrationType: registration.registrationType || (isLocalChapter ? "Local Body Chapter" : "ACM India"),
             registrationDate: formatDate(registrationDate),

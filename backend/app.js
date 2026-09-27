@@ -60,6 +60,16 @@ app.get("/", (req, res) => {
     });
 });
 
+// Health check endpoint for Cron Jobs / Uptime Monitors (keeps Render instance awake 24/7)
+app.get(["/health", "/api/health"], (req, res) => {
+    res.status(200).json({
+        status: "ok",
+        uptime: Math.round(process.uptime()),
+        timestamp: new Date().toISOString(),
+        service: "ACM Registration & Digital ID Verification API"
+    });
+});
+
 app.use(
     "/api/auth",
     authRoutes
